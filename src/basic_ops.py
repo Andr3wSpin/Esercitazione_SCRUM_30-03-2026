@@ -1,14 +1,13 @@
-def sum(a, b):
+def add(a, b):
     return a + b
 
 def subtraction(a, b):
     return a - b
 
 def product(a, b):
-    return a * b;
+    return a * b
 
 def division(a, b):
     if b == 0:
         return None
-
     return a / b
