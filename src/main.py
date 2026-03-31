@@ -1,73 +1,113 @@
-import re
-from basic_ops import add, subtraction, product, division
+from tokens import Number, Operator
 
 
 def tokenize(expr):
     expr = expr.replace(" ", "")
-    pattern = r'\d+(?:\.\d+)?|[+\-*/]'
-    tokens = re.findall(pattern, expr)
+    if not expr:
+        return None, "Empty input"
 
-    # controllo semplice: i token ricostruiti devono coincidere con l'input
-    if ''.join(tokens) != expr:
-        return None
+    tokens = []
+    i = 0
+    expect_number = True
 
-    return tokens
+    while i < len(expr):
+        ch = expr[i]
+
+        if expect_number:
+            sign = 1
+
+            if ch == '-':
+                sign = -1
+                i += 1
+                if i >= len(expr):
+                    return None, "Invalid expression"
+
+            start = i
+            dot_count = 0
+
+            while i < len(expr) and (expr[i].isdigit() or expr[i] == '.'):
+                if expr[i] == '.':
+                    dot_count += 1
+                    if dot_count > 1:
+                        return None, "Invalid number"
+                i += 1
+
+            if start == i:
+                return None, "Expected number"
+
+            number_str = expr[start:i]
+            try:
+                value = sign * float(number_str)
+            except ValueError:
+                return None, "Invalid number"
+
+            tokens.append(Number(value))
+            expect_number = False
+
+        else:
+            if ch not in '+-*/':
+                return None, "Expected operator"
+
+            tokens.append(Operator(ch))
+            i += 1
+            expect_number = True
+
+    if expect_number:
+        return None, "Expression cannot end with an operator"
+
+    return tokens, None
 
 
-def apply_operator(a, op, b):
-    if op == '+':
-        return add(a, b)
-    elif op == '-':
-        return subtraction(a, b)
-    elif op == '*':
-        return product(a, b)
-    elif op == '/':
-        return division(a, b)
-    return None
+def reduce_once(values, operators, index):
+    left = values[index]
+    right = values[index + 1]
+    op = operators[index]
+
+    result = op.apply(left, right)
+    if result is None and op.symbol == '/':
+        return False, "Error: division by zero"
+
+    values[index] = result
+    del values[index + 1]
+    del operators[index]
+    return True, None
 
 
-def evaluate_expression(tokens):
-    if not tokens or len(tokens) % 2 == 0:
+def evaluate(tokens):
+    values = []
+    operators = []
+
+    for token in tokens:
+        if isinstance(token, Number):
+            values.append(token.value)
+        elif isinstance(token, Operator):
+            operators.append(token)
+
+    i = 0
+    while i < len(operators):
+        if operators[i].symbol in '*/':
+            ok, error = reduce_once(values, operators, i)
+            if not ok:
+                return None, error
+        else:
+            i += 1
+
+    i = 0
+    while i < len(operators):
+        ok, error = reduce_once(values, operators, i)
+        if not ok:
+            return None, error
+
+    if len(values) != 1:
         return None, "Invalid expression"
 
-    # i numeri devono stare in posizione pari, gli operatori in posizione dispari
-    for i in range(0, len(tokens), 2):
-        try:
-            tokens[i] = float(tokens[i])
-        except ValueError:
-            return None, "Invalid number"
+    return values[0], None
 
-    for i in range(1, len(tokens), 2):
-        if tokens[i] not in ['+', '-', '*', '/']:
-            return None, "Invalid operator"
 
-    # prima passata: * e /
-    values = [tokens[0]]
-    ops = []
-
-    i = 1
-    while i < len(tokens):
-        op = tokens[i]
-        num = tokens[i + 1]
-
-        if op in ['*', '/']:
-            left = values.pop()
-            result = apply_operator(left, op, num)
-            if result is None and op == '/':
-                return None, "Error: division by zero"
-            values.append(result)
-        else:
-            ops.append(op)
-            values.append(num)
-
-        i += 2
-
-    # seconda passata: + e -
-    result = values[0]
-    for i in range(len(ops)):
-        result = apply_operator(result, ops[i], values[i + 1])
-
-    return result, None
+def format_result(result):
+    if result.is_integer():
+        return str(int(result))
+    return str(result)
 
 
 def main():
@@ -77,21 +117,17 @@ def main():
         if expr.lower() == 'q':
             break
 
-        tokens = tokenize(expr)
-        if tokens is None:
-            print("Invalid input")
-            continue
-
-        result, error = evaluate_expression(tokens)
-
+        tokens, error = tokenize(expr)
         if error:
             print(error)
-        else:
-            # stampa più pulita: 6 invece di 6.0 quando possibile
-            if result.is_integer():
-                print(int(result))
-            else:
-                print(result)
+            continue
+
+        result, error = evaluate(tokens)
+        if error:
+            print(error)
+            continue
+
+        print(format_result(result))
 
 
 if __name__ == "__main__":
