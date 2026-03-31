@@ -1,133 +1,106 @@
-from tokens import Number, Operator
+from basic_ops import add, subtract, multiply, divide, sine, cosine, tangent
 
 
-def tokenize(expr):
-    expr = expr.replace(" ", "")
-    if not expr:
-        return None, "Empty input"
-
-    tokens = []
-    i = 0
-    expect_number = True
-
-    while i < len(expr):
-        ch = expr[i]
-
-        if expect_number:
-            sign = 1
-
-            if ch == '-':
-                sign = -1
-                i += 1
-                if i >= len(expr):
-                    return None, "Invalid expression"
-
-            start = i
-            dot_count = 0
-
-            while i < len(expr) and (expr[i].isdigit() or expr[i] == '.'):
-                if expr[i] == '.':
-                    dot_count += 1
-                    if dot_count > 1:
-                        return None, "Invalid number"
-                i += 1
-
-            if start == i:
-                return None, "Expected number"
-
-            number_str = expr[start:i]
-            try:
-                value = sign * float(number_str)
-            except ValueError:
-                return None, "Invalid number"
-
-            tokens.append(Number(value))
-            expect_number = False
-
-        else:
-            if ch not in '+-*/':
-                return None, "Expected operator"
-
-            tokens.append(Operator(ch))
-            i += 1
-            expect_number = True
-
-    if expect_number:
-        return None, "Expression cannot end with an operator"
-
-    return tokens, None
+def format_result(value):
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
 
 
-def reduce_once(values, operators, index):
-    left = values[index]
-    right = values[index + 1]
-    op = operators[index]
+def read_number(prompt):
+    while True:
+        raw = input(prompt).strip()
 
-    result = op.apply(left, right)
-    if result is None and op.symbol == '/':
-        return False, "Error: division by zero"
-
-    values[index] = result
-    del values[index + 1]
-    del operators[index]
-    return True, None
+        try:
+            return float(raw)
+        except ValueError:
+            print("Invalid input: please enter a real number.")
 
 
-def evaluate(tokens):
-    values = []
-    operators = []
+def handle_binary_operation(history):
+    print("Available operators: +  -  *  /")
+    operator = input("Enter operator: ").strip()
 
-    for token in tokens:
-        if isinstance(token, Number):
-            values.append(token.value)
-        elif isinstance(token, Operator):
-            operators.append(token)
+    if operator not in ["+", "-", "*", "/"]:
+        print("Invalid operation.")
+        return
 
-    i = 0
-    while i < len(operators):
-        if operators[i].symbol in '*/':
-            ok, error = reduce_once(values, operators, i)
-            if not ok:
-                return None, error
-        else:
-            i += 1
+    a = read_number("Enter first number: ")
+    b = read_number("Enter second number: ")
 
-    i = 0
-    while i < len(operators):
-        ok, error = reduce_once(values, operators, i)
-        if not ok:
-            return None, error
+    if operator == "+":
+        result = add(a, b)
+    elif operator == "-":
+        result = subtract(a, b)
+    elif operator == "*":
+        result = multiply(a, b)
+    else:
+        result = divide(a, b)
+        if result is None:
+            print("Error: division by zero.")
+            return
 
-    if len(values) != 1:
-        return None, "Invalid expression"
-
-    return values[0], None
+    operation_text = f"{format_result(a)} {operator} {format_result(b)} = {format_result(result)}"
+    history.append(operation_text)
+    print("Result:", format_result(result))
 
 
-def format_result(result):
-    if result.is_integer():
-        return str(int(result))
-    return str(result)
+def handle_scientific_operation(history):
+    print("Available functions: sin  cos  tan")
+    func = input("Enter function: ").strip().lower()
+
+    if func not in ["sin", "cos", "tan"]:
+        print("Invalid scientific function.")
+        return
+
+    x = read_number("Enter value (in radians): ")
+
+    if func == "sin":
+        result = sine(x)
+    elif func == "cos":
+        result = cosine(x)
+    else:
+        result = tangent(x)
+
+    operation_text = f"{func}({format_result(x)}) = {format_result(result)}"
+    history.append(operation_text)
+    print("Result:", format_result(result))
+
+
+def show_history(history):
+    if not history:
+        print("History is empty.")
+        return
+
+    print("\nOperation history:")
+    for i, item in enumerate(history, start=1):
+        print(f"{i}. {item}")
+    print()
 
 
 def main():
+    history = []
+
     while True:
-        expr = input("Enter expression (or q to quit): ")
+        print("\n=== Calculator Menu ===")
+        print("1. Basic arithmetic operations")
+        print("2. Scientific functions")
+        print("3. Show history")
+        print("4. Exit")
 
-        if expr.lower() == 'q':
+        choice = input("Select an option: ").strip()
+
+        if choice == "1":
+            handle_binary_operation(history)
+        elif choice == "2":
+            handle_scientific_operation(history)
+        elif choice == "3":
+            show_history(history)
+        elif choice == "4":
+            print("Exiting calculator.")
             break
-
-        tokens, error = tokenize(expr)
-        if error:
-            print(error)
-            continue
-
-        result, error = evaluate(tokens)
-        if error:
-            print(error)
-            continue
-
-        print(format_result(result))
+        else:
+            print("Invalid menu option.")
 
 
 if __name__ == "__main__":
